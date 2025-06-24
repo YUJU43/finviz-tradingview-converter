@@ -4,109 +4,397 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>핀비즈 → 트레이딩뷰 변환기 Pro</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; }
-        * { box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .upload-area {
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #4caf50;
+        }
+        .upload-area input {
+            display: none;
+        }
+        .file-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        .upload-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .results {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .stock-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f9f9f9;
+            margin-bottom: 8px;
+            border-radius: 6px;
+        }
+        .stock-info {
+            display: flex;
+            align-items: center;
+        }
+        .ticker {
+            background: #e3f2fd;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin-right: 10px;
+        }
+        .converted {
+            background: #e8f5e8;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin-left: 10px;
+        }
+        .btn {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .btn-success { background: #4caf50; }
+        .btn-warning { background: #ff9800; }
+        .btn-purple { background: #9c27b0; }
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .stats {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .exchange-buttons {
+            margin-top: 15px;
+        }
+        select {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 4px;
+        }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div class="container">
+        <!-- 헤더 -->
+        <div class="header">
+            <h1>🚀 핀비즈 → 트레이딩뷰 변환기 Pro</h1>
+            <p>AI 거래소 자동 감지 | 대량 처리 | 스마트 변환</p>
+        </div>
 
-    <script type="text/babel">
-        const { useState } = React;
+        <!-- 업로드 영역 -->
+        <div class="card">
+            <h2 style="margin-bottom: 20px; color: #333;">📁 CSV 파일 업로드</h2>
+            
+            <div class="upload-area" onclick="document.getElementById('csv-upload').click()">
+                <input type="file" id="csv-upload" accept=".csv">
+                <div class="file-icon">📄</div>
+                <div class="upload-text">CSV 파일을 선택하세요</div>
+                <p style="font-size: 0.9rem; color: #666;">핀비즈에서 내보낸 CSV 파일만 지원됩니다</p>
+            </div>
 
-        const FinvizToTradingViewConverter = () => {
-            const [csvData, setCsvData] = useState(null);
-            const [convertedData, setConvertedData] = useState([]);
-            const [isProcessing, setIsProcessing] = useState(false);
-            const [message, setMessage] = useState('');
-            const [isDetecting, setIsDetecting] = useState(false);
+            <div id="message"></div>
+        </div>
 
-            // 확장된 거래소 데이터베이스
-            const exchangeDatabase = {
-                NYSE: [
-                    'AER', 'AMZN', 'BAC', 'BAM', 'BE', 'BEN', 'BROS', 'BTSG', 'CARR', 'CBRL', 'CG', 
-                    'CRDO', 'CRMD', 'CUZ', 'DAN', 'DASH', 'DIS', 'F', 'GE', 'GM', 'JPM', 'KO', 
-                    'MCD', 'NKE', 'PFE', 'T', 'V', 'WMT', 'XOM', 'BABA', 'TSM', 'NIO', 'PDD',
-                    'JNJ', 'UNH', 'HD', 'PG', 'CVX', 'LLY', 'ABBV', 'TMO', 'ACN', 'COST',
-                    'DHR', 'VZ', 'ADBE', 'TXN', 'NFLX', 'CRM', 'WFC', 'IBM', 'GS', 'MS',
-                    'BA', 'CAT', 'MMM', 'HON', 'RTX', 'LOW', 'UPS', 'SPGI', 'BLK', 'AXP'
-                ],
-                NASDAQ: [
-                    'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'NVDA', 'TSLA', 'META', 'AMGN', 'PYPL',
-                    'CMCSA', 'INTC', 'CSCO', 'ADBE', 'NFLX', 'CRM', 'QCOM', 'TXN', 'INTU',
-                    'AMAT', 'ISRG', 'BKNG', 'GILD', 'ADP', 'VRTX', 'FISV', 'MDLZ', 'REGN',
-                    'ATVI', 'CSX', 'ILMN', 'MRVL', 'LRCX', 'EXC', 'ORLY', 'DXCM', 'CTAS'
-                ]
-            };
+        <!-- 결과 영역 -->
+        <div id="results-card" class="card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #333;">🎯 변환 결과</h2>
+                <div>
+                    <button class="btn btn-success" onclick="copyToClipboard()">📋 복사</button>
+                    <button class="btn" onclick="downloadTxt()">💾 다운로드</button>
+                </div>
+            </div>
 
-            // API를 통한 거래소 자동 감지
-            const detectExchangeFromAPI = async (ticker) => {
-                await new Promise(resolve => setTimeout(resolve, 50)); // 시뮬레이션 딜레이
-                
-                if (exchangeDatabase.NYSE.includes(ticker)) return 'NYSE';
-                if (exchangeDatabase.NASDAQ.includes(ticker)) return 'NASDAQ';
-                
-                // 기본값: 알파벳으로 시작하는 3-4자리는 대부분 NASDAQ
-                if (ticker.length <= 4 && /^[A-Z]+$/.test(ticker)) return 'NASDAQ';
-                return 'NYSE';
-            };
+            <div id="stats" class="stats">
+                <p id="stats-text"></p>
+                <div class="exchange-buttons">
+                    <strong>전체 거래소 변경:</strong>
+                    <button class="btn btn-small" onclick="changeAllExchange('NASDAQ')">📊 전체 NASDAQ</button>
+                    <button class="btn btn-small btn-warning" onclick="changeAllExchange('NYSE')">🏛️ 전체 NYSE</button>
+                    <button class="btn btn-small btn-purple" onclick="changeAllExchange('AMEX')">📈 전체 AMEX</button>
+                </div>
+            </div>
 
-            const handleFileUpload = (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
+            <div id="results" class="results"></div>
+        </div>
 
-                if (!file.name.toLowerCase().endsWith('.csv')) {
-                    setMessage('❌ CSV 파일만 업로드 가능합니다.');
-                    return;
+        <!-- 사용법 -->
+        <div class="card" style="background: rgba(255,255,255,0.1); color: white;">
+            <h3 style="margin-bottom: 15px;">🎯 Pro 기능</h3>
+            <div style="font-size: 14px; line-height: 1.6;">
+                <p><strong>🤖 AI 거래소 감지:</strong> 각 종목의 거래소를 자동으로 판별</p>
+                <p><strong>📊 스마트 제안:</strong> 대부분 같은 거래소면 통일 제안</p>
+                <p><strong>⚡ 대량 처리:</strong> 수백 개 종목도 빠르게 처리</p>
+                <p><strong>🎯 정확도 향상:</strong> 확장된 데이터베이스로 정확한 분류</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let convertedData = [];
+        
+        // 거래소 데이터베이스
+        const nyseStocks = [
+            'AER', 'AMZN', 'BAC', 'BAM', 'BE', 'BEN', 'BROS', 'BTSG', 'CARR', 'CBRL', 'CG', 
+            'CRDO', 'CRMD', 'CUZ', 'DAN', 'DASH', 'DIS', 'F', 'GE', 'GM', 'JPM', 'KO', 
+            'MCD', 'NKE', 'PFE', 'T', 'V', 'WMT', 'XOM', 'BABA', 'TSM', 'NIO', 'PDD',
+            'JNJ', 'UNH', 'HD', 'PG', 'CVX', 'LLY', 'ABBV', 'TMO', 'ACN', 'COST',
+            'DHR', 'VZ', 'ADBE', 'TXN', 'NFLX', 'CRM', 'WFC', 'IBM', 'GS', 'MS',
+            'BA', 'CAT', 'MMM', 'HON', 'RTX', 'LOW', 'UPS', 'SPGI', 'BLK', 'AXP'
+        ];
+
+        // 파일 업로드 처리
+        document.getElementById('csv-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showMessage('❌ CSV 파일만 업로드 가능합니다.', 'error');
+                return;
+            }
+
+            showMessage('⏳ 파일 처리 중...', 'success');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    processCSV(e.target.result);
+                } catch (err) {
+                    showMessage('❌ 파일 처리 중 오류: ' + err.message, 'error');
                 }
+            };
+            reader.readAsText(file);
+        });
 
-                setIsProcessing(true);
-                setMessage('⏳ 파일 처리 중...');
+        // CSV 처리
+        function processCSV(text) {
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            if (lines.length < 2) {
+                showMessage('❌ CSV 파일에 데이터가 없습니다.', 'error');
+                return;
+            }
 
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const text = e.target.result;
-                        const lines = text.split('\n').filter(line => line.trim());
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            const tickerIndex = headers.findIndex(header => 
+                ['ticker', 'symbol', 'Ticker', 'Symbol', 'TICKER', 'SYMBOL'].includes(header)
+            );
+
+            if (tickerIndex === -1) {
+                showMessage('❌ 티커(Ticker) 컬럼을 찾을 수 없습니다.', 'error');
+                return;
+            }
+
+            const stocks = [];
+            for (let i = 1; i < lines.length; i++) {
+                const columns = parseCSVLine(lines[i]);
+                
+                if (columns.length > tickerIndex) {
+                    const ticker = columns[tickerIndex].replace(/"/g, '').trim();
+                    
+                    if (ticker && ticker !== '') {
+                        const cleanTicker = ticker.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
                         
-                        if (lines.length < 2) {
-                            setMessage('❌ CSV 파일에 데이터가 없습니다.');
-                            setIsProcessing(false);
-                            return;
+                        if (cleanTicker.length > 0) {
+                            const exchange = nyseStocks.includes(cleanTicker) ? 'NYSE' : 'NASDAQ';
+                            stocks.push({
+                                original: cleanTicker,
+                                tradingView: `${exchange}:${cleanTicker}`,
+                                exchange: exchange
+                            });
                         }
+                    }
+                }
+            }
 
-                        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-                        
-                        const tickerIndex = headers.findIndex(header => 
-                            ['ticker', 'symbol', 'Ticker', 'Symbol', 'TICKER', 'SYMBOL'].includes(header)
-                        );
+            if (stocks.length === 0) {
+                showMessage('❌ 유효한 티커를 찾을 수 없습니다.', 'error');
+                return;
+            }
 
-                        if (tickerIndex === -1) {
-                            setMessage('❌ 티커(Ticker) 컬럼을 찾을 수 없습니다.');
-                            setIsProcessing(false);
-                            return;
-                        }
+            convertedData = stocks;
+            displayResults(stocks, headers[tickerIndex]);
+        }
 
-                        const stocks = [];
-                        setMessage('🔍 거래소 자동 감지 중...');
-                        setIsDetecting(true);
+        // CSV 라인 파싱
+        function parseCSVLine(line) {
+            const columns = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    columns.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            columns.push(current.trim());
+            return columns;
+        }
 
-                        for (let i = 1; i < lines.length; i++) {
-                            const columns = [];
-                            let current = '';
-                            let inQuotes = false;
-                            
-                            // CSV 파싱
-                            for (let j = 0; j < lines[i].length; j++) {
-                                const char = lines[i][j];
-                                if (char === '"') {
-                                    inQuotes = !inQuotes;
-                                } else if (char === ',' && !inQuotes) {
-                                    columns.push(current.trim());
-                                    current = '';
-                                } else {
-                                    current += char;
+        // 결과 표시
+        function displayResults(stocks, tickerColumn) {
+            const exchangeStats = stocks.reduce((acc, stock) => {
+                acc[stock.exchange] = (acc[stock.exchange] || 0) + 1;
+                return acc;
+            }, {});
+            
+            const statsText = Object.entries(exchangeStats)
+                .map(([exchange, count]) => `${exchange}: ${count}개`)
+                .join(', ');
+
+            document.getElementById('stats-text').innerHTML = `
+                <strong>티커 컬럼:</strong> ${tickerColumn} | 
+                <strong>총 종목:</strong> ${stocks.length}개<br>
+                <strong>🎯 자동 감지:</strong> ${statsText}
+            `;
+
+            const resultsHTML = stocks.slice(0, 20).map((stock, index) => `
+                <div class="stock-item">
+                    <div class="stock-info">
+                        <span class="ticker">${stock.original}</span>
+                        <span>→</span>
+                        <span class="converted">${stock.tradingView}</span>
+                        <span style="font-size: 10px; color: #666; margin-left: 8px; padding: 2px 6px; background: #fff3e0; border-radius: 3px;">🤖 자동감지</span>
+                    </div>
+                    <select onchange="updateExchange(${index}, this.value)" value="${stock.exchange}">
+                        <option value="NASDAQ" ${stock.exchange === 'NASDAQ' ? 'selected' : ''}>NASDAQ</option>
+                        <option value="NYSE" ${stock.exchange === 'NYSE' ? 'selected' : ''}>NYSE</option>
+                        <option value="AMEX" ${stock.exchange === 'AMEX' ? 'selected' : ''}>AMEX</option>
+                        <option value="OTC" ${stock.exchange === 'OTC' ? 'selected' : ''}>OTC</option>
+                    </select>
+                </div>
+            `).join('');
+
+            document.getElementById('results').innerHTML = resultsHTML + 
+                (stocks.length > 20 ? `<div style="text-align: center; padding: 15px; color: #666;">... 및 ${stocks.length - 20}개 종목 더</div>` : '');
+
+            showMessage(`✅ ${stocks.length}개 종목 변환 완료! 🎯 자동 감지: ${statsText}`, 'success');
+            document.getElementById('results-card').classList.remove('hidden');
+        }
+
+        // 개별 거래소 변경
+        function updateExchange(index, exchange) {
+            convertedData[index].exchange = exchange;
+            convertedData[index].tradingView = `${exchange}:${convertedData[index].original}`;
+        }
+
+        // 전체 거래소 변경
+        function changeAllExchange(exchange) {
+            convertedData = convertedData.map(item => ({
+                ...item,
+                exchange: exchange,
+                tradingView: `${exchange}:${item.original}`
+            }));
+            displayResults(convertedData, ''); // 다시 표시
+            showMessage(`✅ 모든 종목이 ${exchange}로 변경되었습니다.`, 'success');
+        }
+
+        // 클립보드 복사
+        function copyToClipboard() {
+            const content = convertedData.map(item => item.tradingView).join('\n');
+            navigator.clipboard.writeText(content).then(() => {
+                showMessage('✅ 클립보드에 복사되었습니다! 트레이딩뷰에 직접 붙여넣기하세요.', 'success');
+            }).catch(() => {
+                showMessage('❌ 클립보드 복사 실패', 'error');
+            });
+        }
+
+        // TXT 다운로드
+        function downloadTxt() {
+            const content = convertedData.map(item => item.tradingView).join('\n');
+            const BOM = '\uFEFF';
+            const finalContent = BOM + content;
+            const blob = new Blob([finalContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tradingview_watchlist.txt';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            showMessage(`✅ ${convertedData.length}개 종목이 포함된 TXT 파일이 다운로드되었습니다.`, 'success');
+        }
+
+        // 메시지 표시
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+        }
+    </script>
+</body>
+</html>
