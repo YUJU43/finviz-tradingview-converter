@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>핀비즈 → 트레이딩뷰 변환기 Pro</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        * { box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const FinvizToTradingViewConverter = () => {
+            const [csvData, setCsvData] = useState(null);
+            const [convertedData, setConvertedData] = useState([]);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [message, setMessage] = useState('');
+            const [isDetecting, setIsDetecting] = useState(false);
+
+            // 확장된 거래소 데이터베이스
+            const exchangeDatabase = {
+                NYSE: [
+                    'AER', 'AMZN', 'BAC', 'BAM', 'BE', 'BEN', 'BROS', 'BTSG', 'CARR', 'CBRL', 'CG', 
+                    'CRDO', 'CRMD', 'CUZ', 'DAN', 'DASH', 'DIS', 'F', 'GE', 'GM', 'JPM', 'KO', 
+                    'MCD', 'NKE', 'PFE', 'T', 'V', 'WMT', 'XOM', 'BABA', 'TSM', 'NIO', 'PDD',
+                    'JNJ', 'UNH', 'HD', 'PG', 'CVX', 'LLY', 'ABBV', 'TMO', 'ACN', 'COST',
+                    'DHR', 'VZ', 'ADBE', 'TXN', 'NFLX', 'CRM', 'WFC', 'IBM', 'GS', 'MS',
+                    'BA', 'CAT', 'MMM', 'HON', 'RTX', 'LOW', 'UPS', 'SPGI', 'BLK', 'AXP'
+                ],
+                NASDAQ: [
+                    'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'NVDA', 'TSLA', 'META', 'AMGN', 'PYPL',
+                    'CMCSA', 'INTC', 'CSCO', 'ADBE', 'NFLX', 'CRM', 'QCOM', 'TXN', 'INTU',
+                    'AMAT', 'ISRG', 'BKNG', 'GILD', 'ADP', 'VRTX', 'FISV', 'MDLZ', 'REGN',
+                    'ATVI', 'CSX', 'ILMN', 'MRVL', 'LRCX', 'EXC', 'ORLY', 'DXCM', 'CTAS'
+                ]
+            };
+
+            // API를 통한 거래소 자동 감지
+            const detectExchangeFromAPI = async (ticker) => {
+                await new Promise(resolve => setTimeout(resolve, 50)); // 시뮬레이션 딜레이
+                
+                if (exchangeDatabase.NYSE.includes(ticker)) return 'NYSE';
+                if (exchangeDatabase.NASDAQ.includes(ticker)) return 'NASDAQ';
+                
+                // 기본값: 알파벳으로 시작하는 3-4자리는 대부분 NASDAQ
+                if (ticker.length <= 4 && /^[A-Z]+$/.test(ticker)) return 'NASDAQ';
+                return 'NYSE';
+            };
+
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                if (!file.name.toLowerCase().endsWith('.csv')) {
+                    setMessage('❌ CSV 파일만 업로드 가능합니다.');
+                    return;
+                }
+
+                setIsProcessing(true);
+                setMessage('⏳ 파일 처리 중...');
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const text = e.target.result;
+                        const lines = text.split('\n').filter(line => line.trim());
+                        
+                        if (lines.length < 2) {
+                            setMessage('❌ CSV 파일에 데이터가 없습니다.');
+                            setIsProcessing(false);
+                            return;
+                        }
+
+                        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                        
+                        const tickerIndex = headers.findIndex(header => 
+                            ['ticker', 'symbol', 'Ticker', 'Symbol', 'TICKER', 'SYMBOL'].includes(header)
+                        );
+
+                        if (tickerIndex === -1) {
+                            setMessage('❌ 티커(Ticker) 컬럼을 찾을 수 없습니다.');
+                            setIsProcessing(false);
+                            return;
+                        }
+
+                        const stocks = [];
+                        setMessage('🔍 거래소 자동 감지 중...');
+                        setIsDetecting(true);
+
+                        for (let i = 1; i < lines.length; i++) {
+                            const columns = [];
+                            let current = '';
+                            let inQuotes = false;
+                            
+                            // CSV 파싱
+                            for (let j = 0; j < lines[i].length; j++) {
+                                const char = lines[i][j];
+                                if (char === '"') {
+                                    inQuotes = !inQuotes;
+                                } else if (char === ',' && !inQuotes) {
+                                    columns.push(current.trim());
+                                    current = '';
+                                } else {
+                                    current += char;
